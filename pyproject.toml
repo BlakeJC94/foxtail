@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "foxtail"
 version = "1.0.0"
-description = ""
+description = "CLI program to print recent firefox bookmarks to stdout using base Python library."
 authors = ["BlakeJC94 <blakejamescook@gmail.com>"]
 readme = "README.md"
+license = {file = "LICENSE"}
 
 [tool.poetry.dependencies]
 python = "^3.10"
-
 
 [build-system]
 requires = ["poetry-core"]
