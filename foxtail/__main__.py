@@ -6,25 +6,26 @@ Usage:
     $ python -m foxtail [firefox_dir] [--hours <HH>] [--days <DD>]
 
 """
+
 import argparse
 import shutil
 import sqlite3
 import tempfile
-from warnings import warn
-from datetime import timedelta
+from datetime import datetime, timedelta
 from itertools import groupby
 from pathlib import Path
 from time import time
 from typing import Dict, List, Tuple
+from warnings import warn
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 
 def parse() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("firefox_dir", default="~/.mozilla/firefox")
-    parser.add_argument("-h", "--hours", type=int, default=0)
-    parser.add_argument("-d", "--days", type=int, default=7)
+    parser.add_argument("firefox_dir", nargs="?", default="~/.mozilla/firefox")
+    parser.add_argument("--hours", type=int, default=0)
+    parser.add_argument("--days", type=int, default=7)
     parser.add_argument("-v", "--version", action="store_true", default=False)
     return parser.parse_args()
 
@@ -79,7 +80,9 @@ def query_database(database: Path, delta: float | int) -> List[Tuple[str, str, i
 def format_results(results: List[Tuple[str, str, int]]) -> List[str]:
     grouped_results: Dict[str, List[Tuple[str, str, int]]] = {
         k: list(v)
-        for k, v in groupby(results, key=lambda x: datetime.fromtimestamp(int(x[2] / 1e6)).date())
+        for k, v in groupby(
+            results, key=lambda x: datetime.fromtimestamp(int(x[2] / 1e6)).date()
+        )
     }
 
     lines = []
@@ -91,7 +94,8 @@ def format_results(results: List[Tuple[str, str, int]]) -> List[str]:
         lines.append("")
 
         date_results = sorted(grouped_results[date], key=lambda x: x[2])
-        for url, title, _ in date_results:
+        for url, title_raw, _ in date_results:
+            title = title_raw.replace("]", "\]").replace("[", "\[")
             lines.append(f"[{title}]({url})")
             lines.append("")
 
