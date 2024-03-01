@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "CLI program to print recent firefox bookmarks to stdout using base Python library."
 authors = ["BlakeJC94 <blakejamescook@gmail.com>"]
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "LICENSE"
 
 [tool.poetry.dependencies]
 python = "^3.10"
