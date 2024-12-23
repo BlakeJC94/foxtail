@@ -11,7 +11,6 @@ import argparse
 import os
 import shutil
 import sqlite3
-import tempfile
 from datetime import datetime, timedelta
 import sys
 from dataclasses import dataclass
@@ -22,6 +21,7 @@ from typing import Dict, List, Tuple
 from warnings import warn
 
 VERSION = "1.0.1"
+CACHE_PATH = Path.home() / ".cache/foxtail"
 
 
 @dataclass
@@ -58,13 +58,14 @@ def foxtail() -> list[str]:
     delta = timedelta(days=args.days, hours=args.hours).total_seconds()
 
     database = get_database(args.firefox_dir)
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        database_cp = Path(tmpdirname) / "places.sqlite"
-        shutil.copy(database, database_cp)
-        results = query_database(database_cp, delta=delta)
 
     lines = format_results(results)
     print("\n".join(lines))
+    database_cp = CACHE_PATH / "places.sqlite"
+    database_cp.parent.mkdir(exist_okay=True, parents=True)
+    shutil.copy(database, database_cp)
+
+    results = query_database(database_cp, after=after, before=before)
 
 
 def get_database(firefox_dir: Path | str) -> Path:
