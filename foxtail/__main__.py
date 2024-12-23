@@ -8,10 +8,12 @@ Usage:
 """
 
 import argparse
+import os
 import shutil
 import sqlite3
 import tempfile
 from datetime import datetime, timedelta
+import sys
 from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
@@ -47,7 +49,7 @@ def parse() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main():
+def foxtail() -> list[str]:
     args = parse()
     if args.version:
         print(VERSION)
@@ -117,6 +119,18 @@ def format_results_table(results: list[Result]) -> list[str]:
             lines.append("")
 
     return lines
+
+
+def main() -> int:
+    exit_code = 0
+    try:
+        print("\n".join(foxtail()))
+    except Exception as err:
+        print(f"Encountered error: {str(err)}", file=sys.stderr)
+        exit_code = 1
+        if os.environ.get("FOXTAIL_DEBUG", "false").lower().startswith("t"):
+            raise err
+    return exit_code
 
 
 if __name__ == "__main__":
