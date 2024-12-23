@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import shutil
 import sqlite3
@@ -140,14 +141,21 @@ def parse() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def foxtail() -> list[str]:
-    args = parse()
+def foxtail(args: argparse.Namespace) -> list[str]:
+    """Generates Foxtail summary from a given query interval.
+
+    Args:
+        args: CLI arguments.
+
+    Returns:
+        Formatted Foxtail summary as strings.
+    """
     if args.version:
         print(VERSION)
         return
 
     if args.before < args.after:
-        raise ValueError()
+        raise ValueError("Invalid query interval")
 
     after = datetime.fromisoformat(args.after)
     before = datetime.fromisoformat(args.before)
@@ -163,10 +171,13 @@ def foxtail() -> list[str]:
     if args.interactive:
         results = input_summaries(results)
 
-    if args.format == "markdown":
-        lines = format_results_markdown(results)
-    else:
-        lines = format_results_table(results)
+    formatter = {
+        "markdown": format_results_markdown,
+        "table": format_results_table,
+        "json": format_results_json,
+        "csv": format_results_csv,
+    }.get(args.format)
+    lines = formatter(results)
 
     return lines
 
@@ -250,6 +261,7 @@ def format_results_table(results: list[Result]) -> list[str]:
         for result in sorted(results, key=lambda x: x.time)
     ]
 
+
 def format_results_csv(results: list[Result]) -> list[str]:
     return [
         ",".join(
@@ -309,7 +321,22 @@ def format_results_markdown(results: list[Result]) -> list[str]:
 def main() -> int:
     exit_code = 0
     try:
-        print("\n".join(foxtail()))
+        args = parse()
+        foxtail_output = "\n".join(foxtail(args))
+        if args.output is None:
+            print(foxtail_output, file=sys.stdout)
+        else:
+            file = Path(args.output)
+            file.parent.mkdir(exist_ok=True, parents=True)
+            suffix = {
+                "markdown": ".md",
+                "table": ".txt",
+                "json": ".json",
+                "csv": ".csv",
+            }.get(args.format)
+            file = file.with_suffix(suffix)
+            with open(file, "w") as f:
+                print(foxtail_output, file=f)
     except Exception as err:
         print(f"Encountered error: {str(err)}", file=sys.stderr)
         exit_code = 1
