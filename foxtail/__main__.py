@@ -1,12 +1,4 @@
-"""Print the bookmarks made in the last 7 days to STDOUT.
-
-Usage:
-
-    $ python foxtail/__main__.py [firefox_dir] [--hours <HH>] [--days <DD>]
-    $ python -m foxtail [firefox_dir] [--hours <HH>] [--days <DD>]
-
-"""
-
+"""A script to help write about recent firefox bookmarks."""
 import argparse
 import json
 import os
@@ -19,18 +11,33 @@ from itertools import groupby
 from pathlib import Path
 from warnings import warn
 
-VERSION = "1.0.1"
+VERSION = "2.0.0"
 CACHE_PATH = Path.home() / ".cache/foxtail"
 
 
 @dataclass
 class Result:
+    """A class to represent a bookmark record.
+
+    Attributes:
+        url: The URL of the result.
+        title: The title of the result.
+        time: The timestamp in microseconds. This will be used to get the date component of the result.
+        summary: The summary of the result. Default value is an empty string.
+    """
+
     url: str
     title: str
     time: int
     summary: str = ""
 
-    def get_date(self) -> datetime.date:
+    def get_date(self) -> str:
+        """Get the date part of the timestamp in the specified timezone and format it as ISO 8601
+        standard.
+
+        Returns:
+            The date component of the result.
+        """
         return (
             datetime.fromtimestamp(int(self.time / 1e6), timezone.utc)
             .astimezone()
@@ -40,9 +47,12 @@ class Result:
 
 
 class InputCache:
+    """Cache manager for the summary inputs."""
+
     cache = CACHE_PATH / "input.sqlite3"
 
     def __init__(self):
+        """Initialize the input cache. If the file does not exist, create a new table. Otherwise, purge old entries."""
         if not self.cache.exists():
             with sqlite3.connect(self.cache) as con:
                 cursor = con.cursor()
@@ -59,6 +69,7 @@ class InputCache:
                 con.commit()
 
     def __contains__(self, url: str) -> bool:
+        """Check if a URL is in the cache."""
         with sqlite3.connect(self.cache) as con:
             cursor = con.cursor()
             query = f"SELECT url FROM input WHERE url = '{url}';"
@@ -66,6 +77,7 @@ class InputCache:
             return True if result else False
 
     def __getitem__(self, url: str) -> str:
+        """Get the summary for a URL from the cache. If not found, raise KeyError."""
         with sqlite3.connect(self.cache) as con:
             cursor = con.cursor()
             query = f"""
@@ -79,6 +91,7 @@ class InputCache:
         return result[0][1]
 
     def __setitem__(self, url: str, summary: str) -> None:
+        """Set the summary for a URL in the cache and update its timeAdded timestamp."""
         cur_time = datetime.now().astimezone().timestamp()
         with sqlite3.connect(self.cache) as con:
             cursor = con.cursor()
@@ -91,12 +104,18 @@ class InputCache:
             con.commit()
 
     def get(self, url: str, fallback=None):
+        """Get the summary for a URL from the cache. If not found, return the fallback value."""
         if url not in self:
             return fallback
         return self[url]
 
 
 def parse() -> argparse.Namespace:
+    """Parse CLI arguments using argparse.
+
+    Returns:
+        argparse.Namespace: Parsed command line arguments as an argparse_namespace object.
+    """
     parser = argparse.ArgumentParser()
     cur_time = datetime.now().astimezone()
 
@@ -104,17 +123,28 @@ def parse() -> argparse.Namespace:
         "firefox_dir",
         nargs="?",
         default="~/.mozilla/firefox",
+        help="Directory path for Mozilla Firefox profiles (default: ~/.mozilla/firefox).",
     )
 
     parser.add_argument(
         "--after",
         type=str,
         default=(cur_time - timedelta(days=7)).isoformat(),
+        help="Return results after this ISO-formatted datetime, (default: 7 days ago).",
     )
     parser.add_argument(
         "--before",
         type=str,
         default=cur_time.isoformat(),
+        help="Return results before this ISO-formatted datetime, (default: now).",
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        nargs="?",
+        help="Output file path (default: stdout)",
     )
 
     parser.add_argument(
@@ -122,7 +152,8 @@ def parse() -> argparse.Namespace:
         "--format",
         type=str,
         default="markdown",
-        choices=["markdown", "table"],
+        choices=["markdown", "table", "json", "csv"],
+        help="Output format choice ('markdown', 'table', 'json', or 'csv'; default: markdown).",
     )
 
     parser.add_argument(
@@ -130,12 +161,14 @@ def parse() -> argparse.Namespace:
         "--version",
         action="store_true",
         default=False,
+        help="Show version information and exit.",
     )
     parser.add_argument(
         "-i",
         "--interactive",
         action="store_true",
         default=False,
+        help="Enable interactive mode for inputting summaries.",
     )
 
     return parser.parse_args()
@@ -187,8 +220,8 @@ def input_summaries(results: list[Result]) -> list[Result]:
     print("Use Ctrl-D to exit")
     print("========")
     cache = InputCache()
-    for result in results:
-        print(result.title)
+    for i, result in enumerate(results, start=1):
+        print(f"{i}: {result.title}")
         print(result.url)
         summary = cache.get(result.url, "")
         if summary:
