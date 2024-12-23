@@ -27,7 +27,7 @@ class Result:
     url: str
     title: str
     time: int
-    # summary: str = ""
+    summary: str = ""
 
     def get_date(self) -> datetime.date:
         return (
@@ -36,6 +36,63 @@ class Result:
             .date()
             .isoformat()
         )
+
+
+class InputCache:
+    cache = CACHE_PATH / "input.sqlite3"
+
+    def __init__(self):
+        if not self.cache.exists():
+            with sqlite3.connect(self.cache) as con:
+                cursor = con.cursor()
+                cursor.execute("CREATE TABLE input(url, summary, timeAdded)")
+                con.commit()
+        else:
+            cur_time = datetime.now().astimezone()
+            delta = timedelta(days=30)
+            with sqlite3.connect(self.cache) as con:
+                cursor = con.cursor()
+                cursor.execute(
+                    f"DELETE FROM input WHERE timeAdded < {(cur_time - delta).timestamp()};"
+                )
+                con.commit()
+
+    def __contains__(self, url: str) -> bool:
+        with sqlite3.connect(self.cache) as con:
+            cursor = con.cursor()
+            query = f"SELECT url FROM input WHERE url = '{url}';"
+            result = cursor.execute(query).fetchall()
+            return True if result else False
+
+    def __getitem__(self, url: str) -> str:
+        with sqlite3.connect(self.cache) as con:
+            cursor = con.cursor()
+            query = f"""
+            SELECT url, summary
+            FROM input
+            WHERE url = '{url}';
+            """
+            result = cursor.execute(query).fetchall()
+        if not result:
+            raise KeyError(f"'{url}' not found")
+        return result[0][1]
+
+    def __setitem__(self, url: str, summary: str) -> None:
+        cur_time = datetime.now().astimezone().timestamp()
+        with sqlite3.connect(self.cache) as con:
+            cursor = con.cursor()
+            query = f"""
+            UPDATE input
+            SET summary = '{summary}', timeAdded = {cur_time}
+            WHERE url = '{url}';
+            """
+            cursor.execute(query)
+            con.commit()
+
+    def get(self, url: str, fallback=None):
+        if url not in self:
+            return fallback
+        return self[url]
 
 
 def parse() -> argparse.Namespace:
@@ -73,7 +130,13 @@ def parse() -> argparse.Namespace:
         action="store_true",
         default=False,
     )
-    # parser.add_argument("-i", "--interactive", action="store_true", default=False)
+    parser.add_argument(
+        "-i",
+        "--interactive",
+        action="store_true",
+        default=False,
+    )
+
     return parser.parse_args()
 
 
@@ -92,12 +155,13 @@ def foxtail() -> list[str]:
     database = get_database(args.firefox_dir)
 
     database_cp = CACHE_PATH / "places.sqlite"
-    database_cp.parent.mkdir(exist_okay=True, parents=True)
+    database_cp.parent.mkdir(exist_ok=True, parents=True)
     shutil.copy(database, database_cp)
 
     results = query_database(database_cp, after=after, before=before)
 
-    # TODO interactive mode
+    if args.interactive:
+        results = input_summaries(results)
 
     if args.format == "markdown":
         lines = format_results_markdown(results)
@@ -105,6 +169,44 @@ def foxtail() -> list[str]:
         lines = format_results_table(results)
 
     return lines
+
+
+def input_summaries(results: list[Result]) -> list[Result]:
+    print(f"Starting interactive annotation mode for {len(results)} entries")
+    print("Use Ctrl-D to exit")
+    print("========")
+    cache = InputCache()
+    for result in results:
+        print(result.title)
+        print(result.url)
+        summary = cache.get(result.url, "")
+        if summary:
+            print(">> Previous summary:")
+            for line in summary.split("\n"):
+                print(f">> {line}")
+
+        try:
+            summary = multiline_input("> ", 2)
+            cache[result.url] = summary
+        except EOFError:
+            break
+
+        result.summary = summary
+        print("")
+    print("========")
+    return results
+
+
+def multiline_input(prompt, max_returns) -> str:
+    x = input(prompt)
+    inp = [x]
+    n_lines = 1 if x == "" else 0
+    while n_lines < max_returns:
+        x = input(prompt)
+        inp.append(x)
+        if x == "":
+            n_lines += 1
+    return "\n".join(inp).strip()
 
 
 def get_database(firefox_dir: Path | str) -> Path:
@@ -124,7 +226,6 @@ def get_database(firefox_dir: Path | str) -> Path:
 def query_database(database: Path, after: datetime, before: datetime) -> list[Result]:
     with sqlite3.connect(database) as con:
         cursor = con.cursor()
-
         query = f"""
         SELECT p.url, b.title, b.dateAdded
         FROM moz_places p INNER JOIN moz_bookmarks b
@@ -138,9 +239,45 @@ def query_database(database: Path, after: datetime, before: datetime) -> list[Re
 
 def format_results_table(results: list[Result]) -> list[str]:
     return [
-        "\t".join([result.get_date(), result.title, result.url])
+        "\t".join(
+            [
+                result.get_date(),
+                result.title,
+                result.url,
+                result.summary.replace("\n", "\\n"),
+            ]
+        )
         for result in sorted(results, key=lambda x: x.time)
     ]
+
+def format_results_csv(results: list[Result]) -> list[str]:
+    return [
+        ",".join(
+            [
+                result.get_date(),
+                result.title,
+                result.url,
+                result.summary.replace("\n", "\\n"),
+            ]
+        )
+        for result in sorted(results, key=lambda x: x.time)
+    ]
+
+
+def format_results_json(results: list[Result]) -> list[str]:
+    output = {
+        "results": [
+            {
+                "date": result.get_date(),
+                "title": result.title,
+                "url": result.url,
+                "summary": result.summary.replace("\n", "\\n"),
+            }
+            for result in sorted(results, key=lambda x: x.time)
+        ]
+    }
+    output = json.dumps(output, indent=2)
+    return output.split("\n")
 
 
 def format_results_markdown(results: list[Result]) -> list[str]:
@@ -162,6 +299,9 @@ def format_results_markdown(results: list[Result]) -> list[str]:
             title_escaped = result.title.replace("]", "\]").replace("[", "\[")
             lines.append(f"[{title_escaped}]({result.url})")
             lines.append("")
+            if result.summary:
+                lines.append(result.summary)
+                lines.append("")
 
     return lines
 
