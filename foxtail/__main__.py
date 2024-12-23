@@ -12,6 +12,7 @@ import shutil
 import sqlite3
 import tempfile
 from datetime import datetime, timedelta
+from dataclasses import dataclass
 from itertools import groupby
 from pathlib import Path
 from time import time
@@ -19,6 +20,22 @@ from typing import Dict, List, Tuple
 from warnings import warn
 
 VERSION = "1.0.1"
+
+
+@dataclass
+class Result:
+    url: str
+    title: str
+    time: int
+    # summary: str = ""
+
+    def get_date(self) -> datetime.date:
+        return (
+            datetime.fromtimestamp(int(self.time / 1e6), timezone.utc)
+            .astimezone()
+            .date()
+            .isoformat()
+        )
 
 
 def parse() -> argparse.Namespace:
@@ -62,8 +79,8 @@ def get_database(firefox_dir: Path | str) -> Path:
     return database
 
 
-def query_database(database: Path, delta: float | int) -> List[Tuple[str, str, int]]:
     cur_time = time()
+def query_database(database: Path, after: datetime, before: datetime) -> list[Result]:
     with sqlite3.connect(database) as con:
         cursor = con.cursor()
 
@@ -74,12 +91,12 @@ def query_database(database: Path, delta: float | int) -> List[Tuple[str, str, i
         WHERE b.dateAdded > {(cur_time - delta) * 1e6};
         """
 
-        return cursor.execute(query).fetchall()
+        return [Result(*row) for row in cursor.execute(query).fetchall()]
 
 
-def format_results(results: List[Tuple[str, str, int]]) -> List[str]:
     grouped_results: Dict[str, List[Tuple[str, str, int]]] = {
         k: list(v)
+def format_results_table(results: list[Result]) -> list[str]:
         for k, v in groupby(
             results, key=lambda x: datetime.fromtimestamp(int(x[2] / 1e6)).date()
         )
