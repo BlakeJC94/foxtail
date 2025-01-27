@@ -56,7 +56,7 @@ options:
   --before BEFORE       Return results before this ISO-formatted datetime,
                         (default: now).
   -o, --output [OUTPUT]
-                        Output file path (default: stdout)
+                        Output file path (default: `./foxtail.txt`)
   -f, --format {markdown,table,json,csv}
                         Output format choice ('markdown', 'table', 'json', or
                         'csv'; default: markdown).
