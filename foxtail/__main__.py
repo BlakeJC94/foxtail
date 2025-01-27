@@ -12,7 +12,7 @@ from itertools import groupby
 from pathlib import Path
 from warnings import warn
 
-VERSION = "2.0.0"
+VERSION = "3.0.0"
 CACHE_PATH = Path.home() / ".cache/foxtail"
 
 
