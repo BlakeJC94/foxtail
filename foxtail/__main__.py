@@ -351,9 +351,16 @@ def format_results_markdown(results: list[Result]) -> list[str]:
     return lines
 
 
+def check_python_version():
+    python_version = sys.version_info
+    if python_version.major < 3 or python_version.minor < 10:  # noqa: PLR2004
+        raise RuntimeError("foxtail requires Python >= 3.10")
+
+
 def main() -> int:
     exit_code = 0
     try:
+        check_python_version()
         args = parse()
         foxtail_output = "\n".join(foxtail(args))
         file = Path(args.output or "./foxtail.txt")
