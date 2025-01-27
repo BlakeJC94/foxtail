@@ -144,7 +144,7 @@ def parse() -> argparse.Namespace:
         "--output",
         type=str,
         nargs="?",
-        help="Output file path (default: stdout)",
+        help="Output file path (default: ./foxtail.txt)",
     )
 
     parser.add_argument(
@@ -356,20 +356,17 @@ def main() -> int:
     try:
         args = parse()
         foxtail_output = "\n".join(foxtail(args))
-        if args.output is None:
-            print(foxtail_output, file=sys.stdout)
-        else:
-            file = Path(args.output)
-            file.parent.mkdir(exist_ok=True, parents=True)
-            suffix = {
-                "markdown": ".md",
-                "table": ".txt",
-                "json": ".json",
-                "csv": ".csv",
-            }.get(args.format)
-            file = file.with_suffix(suffix)
-            with open(file, "w") as f:
-                print(foxtail_output, file=f)
+        file = Path(args.output or "./foxtail.txt")
+        file.parent.mkdir(exist_ok=True, parents=True)
+        suffix = {
+            "markdown": ".md",
+            "table": ".txt",
+            "json": ".json",
+            "csv": ".csv",
+        }.get(args.format)
+        file = file.with_suffix(suffix)
+        with open(file, "w") as f:
+            print(foxtail_output, file=f)
     except Exception as err:
         print(f"Encountered error: {str(err)}", file=sys.stderr)
         exit_code = 1
