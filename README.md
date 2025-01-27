@@ -62,6 +62,7 @@ options:
                         'csv'; default: markdown).
   -v, --version         Show version information and exit.
   -i, --interactive     Enable interactive mode for inputting summaries.
+  -w, --overwrite       Overwrite output file if present.
 ```
 
 ## Issues and contributions

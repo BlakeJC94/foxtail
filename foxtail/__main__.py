@@ -171,6 +171,13 @@ def parse() -> argparse.Namespace:
         default=False,
         help="Enable interactive mode for inputting summaries.",
     )
+    parser.add_argument(
+        "-w",
+        "--overwrite",
+        action="store_true",
+        default=False,
+        help="Overwrite output file if present.",
+    )
 
     return parser.parse_args()
 
