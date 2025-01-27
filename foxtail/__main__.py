@@ -1,4 +1,5 @@
 """A script to help write about recent firefox bookmarks."""
+
 import argparse
 import json
 import os
