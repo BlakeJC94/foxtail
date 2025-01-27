@@ -375,6 +375,7 @@ def main() -> int:
         file = file.with_suffix(suffix)
         with open(file, "w") as f:
             print(foxtail_output, file=f)
+        print(f"Generated output at {str(file)}", file=sys.stderr)
     except Exception as err:
         print(f"Encountered error: {str(err)}", file=sys.stderr)
         exit_code = 1
