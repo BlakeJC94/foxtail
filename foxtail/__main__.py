@@ -370,8 +370,10 @@ def main() -> int:
     try:
         check_python_version()
         args = parse()
-        foxtail_output = "\n".join(foxtail(args))
         file = Path(args.output or "./foxtail.txt")
+        if file.exists() and not args.overwrite:
+            raise FileExistsError(f"Output file {str(file)} already exists.")
+        foxtail_output = "\n".join(foxtail(args))
         file.parent.mkdir(exist_ok=True, parents=True)
         suffix = {
             "markdown": ".md",
