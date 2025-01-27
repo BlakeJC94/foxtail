@@ -1,4 +1,5 @@
 """A script to help write about recent firefox bookmarks."""
+
 import argparse
 import json
 import os
@@ -11,7 +12,7 @@ from itertools import groupby
 from pathlib import Path
 from warnings import warn
 
-VERSION = "2.0.0"
+VERSION = "3.0.0"
 CACHE_PATH = Path.home() / ".cache/foxtail"
 
 
@@ -144,7 +145,7 @@ def parse() -> argparse.Namespace:
         "--output",
         type=str,
         nargs="?",
-        help="Output file path (default: stdout)",
+        help="Output file path (default: ./foxtail.txt)",
     )
 
     parser.add_argument(
@@ -169,6 +170,13 @@ def parse() -> argparse.Namespace:
         action="store_true",
         default=False,
         help="Enable interactive mode for inputting summaries.",
+    )
+    parser.add_argument(
+        "-w",
+        "--overwrite",
+        action="store_true",
+        default=False,
+        help="Overwrite output file if present.",
     )
 
     return parser.parse_args()
@@ -351,25 +359,32 @@ def format_results_markdown(results: list[Result]) -> list[str]:
     return lines
 
 
+def check_python_version():
+    python_version = sys.version_info
+    if python_version.major < 3 or python_version.minor < 10:  # noqa: PLR2004
+        raise RuntimeError("foxtail requires Python >= 3.10")
+
+
 def main() -> int:
     exit_code = 0
     try:
+        check_python_version()
         args = parse()
+        file = Path(args.output or "./foxtail.txt")
+        if file.exists() and not args.overwrite:
+            raise FileExistsError(f"Output file {str(file)} already exists.")
         foxtail_output = "\n".join(foxtail(args))
-        if args.output is None:
-            print(foxtail_output, file=sys.stdout)
-        else:
-            file = Path(args.output)
-            file.parent.mkdir(exist_ok=True, parents=True)
-            suffix = {
-                "markdown": ".md",
-                "table": ".txt",
-                "json": ".json",
-                "csv": ".csv",
-            }.get(args.format)
-            file = file.with_suffix(suffix)
-            with open(file, "w") as f:
-                print(foxtail_output, file=f)
+        file.parent.mkdir(exist_ok=True, parents=True)
+        suffix = {
+            "markdown": ".md",
+            "table": ".txt",
+            "json": ".json",
+            "csv": ".csv",
+        }.get(args.format)
+        file = file.with_suffix(suffix)
+        with open(file, "w") as f:
+            print(foxtail_output, file=f)
+        print(f"Generated output at {str(file)}", file=sys.stderr)
     except Exception as err:
         print(f"Encountered error: {str(err)}", file=sys.stderr)
         exit_code = 1
